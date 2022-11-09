@@ -646,7 +646,7 @@ void ProtocolGame::parsePacket(NetworkMessage& msg)
 				return;
 			}
 
-			g_scheduler().addEvent(createSchedulerTask(100, std::bind(&ProtocolGame::sendPing, getThis())));	//29
+			g_scheduler().addEvent(createSchedulerTask(100, std::bind(&ProtocolGame::sendPing, getThis())));
 
 			if (!player->spawn()) {
 				g_dispatcher().addTask(createTask(std::bind(&ProtocolGame::disconnect, getThis())));
@@ -661,7 +661,7 @@ void ProtocolGame::parsePacket(NetworkMessage& msg)
 
 		if (recvbyte == 0x1D) {
 			// keep the connection alive
-			g_scheduler().addEvent(createSchedulerTask(500, std::bind(&ProtocolGame::sendPingBack, getThis())));	//30
+			g_scheduler().addEvent(createSchedulerTask(500, std::bind(&ProtocolGame::sendPingBack, getThis())));
 			return;
 		}
 	}
@@ -701,7 +701,6 @@ void ProtocolGame::parsePacketFromDispatcher(NetworkMessage msg, uint8_t recvbyt
 
 	switch (recvbyte) {
 		case 0x14: g_dispatcher().addTask(createTask(std::bind(&ProtocolGame::logout, getThis(), true, false))); break;
-		case 0x1C: break;
 		case 0x1D: addGameTask(&Game::playerReceivePingBack, player->getID()); break;
 		case 0x1E: addGameTask(&Game::playerReceivePing, player->getID()); break;
 		case 0x2a: addBestiaryTrackerList(msg); break;
