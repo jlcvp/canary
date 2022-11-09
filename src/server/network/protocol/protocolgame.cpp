@@ -628,17 +628,16 @@ void ProtocolGame::parsePacket(NetworkMessage& msg)
 
 	if (!player || player->isRemoved()) {
 		if (recvbyte == 0x0F) {
-			disconnect();
+			g_dispatcher().addTask(createTask(std::bind(&ProtocolGame::disconnect, getThis())));
 		}
-
 		return;
 	}
 
 	// A dead player can not performs actions
 	if (player->isDead() || player->getHealth() <= 0) {
 		if (recvbyte == 0x14) {
-			disconnect();
-			IOLoginData::updateOnlineStatus(player->getGUID(), false);
+			g_dispatcher().addTask(createTask(std::bind(&ProtocolGame::disconnect, getThis())));
+			g_dispatcher().addTask(createTask(std::bind(&IOLoginData::updateOnlineStatus, player->getGUID(), false)));
 			return;
 		}
 
@@ -646,34 +645,23 @@ void ProtocolGame::parsePacket(NetworkMessage& msg)
 			if (!player) {
 				return;
 			}
-			
+
+			g_scheduler().addEvent(createSchedulerTask(100, std::bind(&ProtocolGame::sendPing, getThis())));	//29
+
 			if (!player->spawn()) {
-				disconnect();
-				g_game().removeCreature(player);
+				g_dispatcher().addTask(createTask(std::bind(&ProtocolGame::disconnect, getThis())));
+				addGameTask(&Game::removeCreature, player, true);
 				return;
 			}
 
-			sendAddCreature(player, player->getPosition(), 0, false);
-
-			std::string bless = player->getBlessingsName();
-			std::ostringstream lostBlesses;
-			(bless.length() == 0) ? lostBlesses << "You lost all your blessings." : lostBlesses <<  "You are still blessed with " << bless;
-			player->sendTextMessage(MESSAGE_EVENT_ADVANCE, lostBlesses.str());
-			if (player->getLevel() < g_configManager().getNumber(ADVENTURERSBLESSING_LEVEL)) {
-				for (uint8_t i = 2; i <= 6; i++) {
-					if (!player->hasBlessing(i)) {
-						player->addBlessing(i, 1);
-					}
-				}
-				sendBlessStatus();
-			}
+			g_dispatcher().addTask(createTask(std::bind(&ProtocolGame::sendAddCreature, getThis(), player, player->getPosition(), 0, false)));
+			g_dispatcher().addTask(createTask(std::bind(&ProtocolGame::addBless, getThis())));
 			return;
 		}
 
-		if (recvbyte != 0x1D && recvbyte != 0x1E) {
+		if (recvbyte == 0x1D) {
 			// keep the connection alive
-			g_scheduler().addEvent(createSchedulerTask(500, std::bind(&ProtocolGame::sendPing, getThis())));
-			g_scheduler().addEvent(createSchedulerTask(1000, std::bind(&ProtocolGame::sendPingBack, getThis())));
+			g_scheduler().addEvent(createSchedulerTask(500, std::bind(&ProtocolGame::sendPingBack, getThis())));	//30
 			return;
 		}
 	}
@@ -684,6 +672,21 @@ void ProtocolGame::parsePacket(NetworkMessage& msg)
 	}
 
 	g_dispatcher().addTask(createTask(std::bind(&ProtocolGame::parsePacketFromDispatcher, getThis(), msg, recvbyte)));
+}
+
+void ProtocolGame::addBless() {
+	std::string bless = player->getBlessingsName();
+	std::ostringstream lostBlesses;
+	(bless.length() == 0) ? lostBlesses << "You lost all your blessings." : lostBlesses <<  "You are still blessed with " << bless;
+	player->sendTextMessage(MESSAGE_EVENT_ADVANCE, lostBlesses.str());
+	if (player->getLevel() < g_configManager().getNumber(ADVENTURERSBLESSING_LEVEL)) {
+		for (uint8_t i = 2; i <= 6; i++) {
+			if (!player->hasBlessing(i)) {
+				player->addBlessing(i, 1);
+			}
+		}
+		sendBlessStatus();
+	}
 }
 
 void ProtocolGame::parsePacketFromDispatcher(NetworkMessage msg, uint8_t recvbyte)
@@ -698,6 +701,7 @@ void ProtocolGame::parsePacketFromDispatcher(NetworkMessage msg, uint8_t recvbyt
 
 	switch (recvbyte) {
 		case 0x14: g_dispatcher().addTask(createTask(std::bind(&ProtocolGame::logout, getThis(), true, false))); break;
+		case 0x1C: break;
 		case 0x1D: addGameTask(&Game::playerReceivePingBack, player->getID()); break;
 		case 0x1E: addGameTask(&Game::playerReceivePing, player->getID()); break;
 		case 0x2a: addBestiaryTrackerList(msg); break;

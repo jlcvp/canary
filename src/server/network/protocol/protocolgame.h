@@ -494,6 +494,7 @@ private:
 	void sendOpenStash();
 	void parseStashWithdraw(NetworkMessage &msg);
 	void sendSpecialContainersAvailable();
+	void addBless();
 };
 
 #endif  // SRC_SERVER_NETWORK_PROTOCOL_PROTOCOLGAME_H_
